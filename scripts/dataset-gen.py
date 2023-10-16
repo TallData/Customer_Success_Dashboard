@@ -134,12 +134,18 @@ for snapshot_date in snapshot_dates:
     for _, customer in customers.iterrows():
         customer_id = customer['CustomerID']
         customer_state = customer['State']
-        assigned_vertical = customer['Vertical']  # Retrieve the assigned vertical
+        assigned_vertical = customer['Vertical']
 
         # Filter out snapshot dates before the customer's FirstPurchaseDate
         if snapshot_date >= customer['FirstPurchaseDate']:
-            contract_months = (snapshot_date - customer['FirstPurchaseDate']).days // 30 % 12
-            customer_detail_data.append({
+            contract_months = ((snapshot_date - customer['FirstPurchaseDate']).days // 30 % 12) + 1
+            contract_status = simulate_churn_upsell({
+                'SnapshotDate': snapshot_date,
+                'FirstPurchaseDate': customer['FirstPurchaseDate']
+            })
+
+            # Create a dictionary with the relevant customer data
+            customer_data = {
                 'SnapshotDate': snapshot_date,
                 'CustomerID': customer_id,
                 'FirstName': customer['FirstName'],
@@ -147,9 +153,15 @@ for snapshot_date in snapshot_dates:
                 'State': customer_state,
                 'FirstPurchaseDate': customer['FirstPurchaseDate'],
                 'Vertical': assigned_vertical,
-                'ContractMonth': contract_months,  # Add the contract month
-                'ContractStatus': 'Active'  # Add the initial contract status (you can modify this as needed)
-            })
+                'ContractMonth': contract_months,
+                'ContractStatus': contract_status
+            }
+
+            # Apply the 'update_contract_status_and_mrr' function to update ContractStatus and MRR
+            updated_data = update_contract_status_and_mrr(customer_data)
+
+            # Append the updated data to the customer_detail_data list
+            customer_detail_data.append(updated_data)
 
             # Generate random MRR and support ticket data with 2 decimal places
             mrr = max(round(np.random.normal(1000, 550), -1), 100)
@@ -169,68 +181,68 @@ for snapshot_date in snapshot_dates:
                 'AverageCSAT': average_ticket_score
             })
 
-# Create dataframes for customer detail, MRR, and support ticket data
-customer_detail_data = pd.DataFrame(customer_detail_data)
-mrr_data = pd.DataFrame(mrr_data)
-support_tickets_data = pd.DataFrame(support_tickets_data)
+# # Create dataframes for customer detail, MRR, and support ticket data
+# customer_detail_data = pd.DataFrame(customer_detail_data)
+# mrr_data = pd.DataFrame(mrr_data)
+# support_tickets_data = pd.DataFrame(support_tickets_data)
 
-support_tickets_data['TotalCSAT'] = round(support_tickets_data['SupportTickets'] * support_tickets_data['AverageCSAT'],2)
+# support_tickets_data['TotalCSAT'] = round(support_tickets_data['SupportTickets'] * support_tickets_data['AverageCSAT'],2)
 
-# Merge 'mrr_data' into 'customer_detail_data'
-combined_data = customer_detail_data.merge(mrr_data, on=['CustomerID', 'SnapshotDate'], how='left')
-combined_data = combined_data.merge(support_tickets_data, on=['CustomerID', 'SnapshotDate'], how='left')
+# # Merge 'mrr_data' into 'customer_detail_data'
+# combined_data = customer_detail_data.merge(mrr_data, on=['CustomerID', 'SnapshotDate'], how='left')
+# combined_data = combined_data.merge(support_tickets_data, on=['CustomerID', 'SnapshotDate'], how='left')
 
-# Apply the update_contract_status_and_mrr function to update the data
-combined_data[['ContractStatus', 'MRR']] = combined_data.apply(update_contract_status_and_mrr, axis=1)
+# # Apply the update_contract_status_and_mrr function to update the data
+# combined_data[['ContractStatus', 'MRR']] = combined_data.apply(update_contract_status_and_mrr, axis=1)
 
-# Identify the first churn date for each customer
-first_churn_dates = combined_data[combined_data['ContractStatus'] == 'Churned'].groupby('CustomerID')['SnapshotDate'].min().reset_index()
+# # Identify the first churn date for each customer
+# first_churn_dates = combined_data[combined_data['ContractStatus'] == 'Churned'].groupby('CustomerID')['SnapshotDate'].min().reset_index()
 
-# Merge this information back into the customer_detail_data
-combined_data = combined_data.merge(first_churn_dates, on='CustomerID', suffixes=('', '_FirstChurn'))
+# # Merge this information back into the customer_detail_data
+# combined_data = combined_data.merge(first_churn_dates, on='CustomerID', suffixes=('', '_FirstChurn'))
 
-# Filter out records with a SnapshotDate later than the first churn date
-combined_data = combined_data[combined_data['SnapshotDate'] <= combined_data['SnapshotDate_FirstChurn']]
+# # Filter out records with a SnapshotDate later than the first churn date
+# combined_data = combined_data[combined_data['SnapshotDate'] <= combined_data['SnapshotDate_FirstChurn']]
 
-# Clean up by removing unnecessary columns
-combined_data.drop(columns=['SnapshotDate_FirstChurn'], inplace=True)
+# # Clean up by removing unnecessary columns
+# combined_data.drop(columns=['SnapshotDate_FirstChurn'], inplace=True)
 
-# Save data to CSV in the data directory
-combined_customer_file = os.path.join(data_dir, 'combined_customer_data.csv')
-mrr_data.to_csv(os.path.join(data_dir, 'mrr_data.csv'), index=False)
-support_tickets_data.to_csv(os.path.join(data_dir, 'support_tickets_data.csv'), index=False)
+# # Save data to CSV in the data directory
+# combined_customer_file = os.path.join(data_dir, 'combined_customer_data.csv')
+# mrr_data.to_csv(os.path.join(data_dir, 'mrr_data.csv'), index=False)
+# support_tickets_data.to_csv(os.path.join(data_dir, 'support_tickets_data.csv'), index=False)
 
-print("Mock customer success detail for MRR, Support Tickets, and Customer Demo is generated and saved as CSV in the 'data' folder.")
+# print("Mock customer success detail for MRR, Support Tickets, and Customer Demo is generated and saved as CSV in the 'data' folder.")
 
 
-combined_data.to_csv(combined_customer_file, index=False)
+# combined_data.to_csv(combined_customer_file, index=False)
 
-print("Mock combined data generated and saved as CSV in the 'data' folder.")
+# print("Mock combined data generated and saved as CSV in the 'data' folder.")
 
-# Calculate MRR and Support Tickets summary for the total customer base
-total_customer_base_summary = combined_data.groupby('SnapshotDate').agg({
-    'MRR': 'sum',
-    'SupportTickets': 'sum',
-    'TotalCSAT': 'sum'
-}).rename(columns={'MRR': 'Total_MRR', 'SupportTickets': 'Total_SupportTickets','TotalCSAT': 'TotalCSAT'}).reset_index()
+# # Calculate MRR and Support Tickets summary for the total customer base
+# total_customer_base_summary = combined_data.groupby('SnapshotDate').agg({
+#     'MRR': 'sum',
+#     'SupportTickets': 'sum',
+#     'TotalCSAT': 'sum'
+# }).rename(columns={'MRR': 'Total_MRR', 'SupportTickets': 'Total_SupportTickets','TotalCSAT': 'TotalCSAT'}).reset_index()
 
-# Calculate MRR and Support Tickets summary for new customers matching the purchase date and snapshot date
-new_customers_summary = combined_data[combined_data['FirstPurchaseDate'] == combined_data['SnapshotDate']].groupby('SnapshotDate').agg({
-    'MRR': 'sum',
-    'SupportTickets': 'sum',
-    'TotalCSAT': 'sum'
-}).rename(columns={'MRR': 'New_MRR', 'SupportTickets': 'New_SupportTickets','TotalCSAT': 'New_TotalCSAT'}).reset_index()
+# # Calculate MRR and Support Tickets summary for new customers matching the purchase date and snapshot date
+# new_customers_summary = combined_data[combined_data['FirstPurchaseDate'] == combined_data['SnapshotDate']].groupby('SnapshotDate').agg({
+#     'MRR': 'sum',
+#     'SupportTickets': 'sum',
+#     'TotalCSAT': 'sum'
+# }).rename(columns={'MRR': 'New_MRR', 'SupportTickets': 'New_SupportTickets','TotalCSAT': 'New_TotalCSAT'}).reset_index()
 
-# Save the summary data to CSV
-total_customer_base_summary.to_csv(os.path.join(data_dir, 'total_customer_base_summary.csv'), index=False)
-new_customers_summary.to_csv(os.path.join(data_dir, 'new_customers_summary.csv'), index=False)
+# # Save the summary data to CSV
+# total_customer_base_summary.to_csv(os.path.join(data_dir, 'total_customer_base_summary.csv'), index=False)
+# new_customers_summary.to_csv(os.path.join(data_dir, 'new_customers_summary.csv'), index=False)
 
-print("SnapshotDate summary parts saved as CSV in the 'data' folder.")
+# print("SnapshotDate summary parts saved as CSV in the 'data' folder.")
 
-# Combine total_customer_base_summary and new_customers_summary
-combined_summary = total_customer_base_summary.merge(new_customers_summary, on='SnapshotDate', how='left')
+# # Combine total_customer_base_summary and new_customers_summary
+# combined_summary = total_customer_base_summary.merge(new_customers_summary, on='SnapshotDate', how='left')
 
-# Save the combined summary data to CSV
-combined_summary.to_csv(os.path.join(data_dir, 'combined_summary.csv'), index=False)
+# # Save the combined summary data to CSV
+# combined_summary.to_csv(os.path.join(data_dir, 'combined_summary.csv'), index=False)
 
-print("New customer summary parts saved as CSV in the 'data' folder.")
+# print("New customer summary parts saved as CSV in the 'data' folder.")
