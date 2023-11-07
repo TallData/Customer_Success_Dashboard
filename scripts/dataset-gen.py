@@ -32,7 +32,7 @@ def update_contract_status_and_mrr_for_month(row):
     customer_id = row.get('CustomerID')
     contract_year = row.get('ContractYears')
 
-    termination_prob, upsell_prob, downsell_prob = random.uniform(0.01, 0.2), random.uniform(0.10, 0.40), random.uniform(0.10, 0.20)
+    termination_prob, upsell_prob, downsell_prob = random.uniform(0.01, 0.4), random.uniform(0.01, 0.40), random.uniform(0.10, 0.20)
 
     if random.random() < termination_prob:
         new_contract_status, new_mrr = 'Churned', 0
@@ -62,9 +62,13 @@ def generate_support_tickets():
 def generate_csat():
     return round(random.uniform(0, 5), 2)
 
+# Function to generate a random percent to goal between 80% and 125%
+def generate_percent_to_goal():
+    return round(random.uniform(0.80, 1.25),2)
+
 # Set the number of customers and months
-n_customers = 1000
-n_months = 36
+n_customers = 5000
+n_months = 48
 #snp_dte = '2020-01-01'
 
 #snapshot_dates = generate_snapshot_dates(snp_dte,n_months)
@@ -96,6 +100,8 @@ def generate_customer_data(n_customers, n_months):
         support_tickets = generate_support_tickets()
         csat = generate_csat()
 
+        percent_to_goal = generate_percent_to_goal()  # Generate percent to goal value
+
         # Calculate the end date for snapshots
         end_date = purchase_date + pd.DateOffset(months=n_months)
         snapshot_dates = pd.date_range(start=purchase_date, end=end_date, freq='M')
@@ -109,14 +115,10 @@ def generate_customer_data(n_customers, n_months):
             # Reset contract months after every 12 months
             contract_months_in_year = (contract_months - 1) % 12 + 1
 
-            data.append([customer_id, first_name, last_name, state, purchase_date, snapshot_date, relationship_months, contract_years, contract_months, vertical, mrr, support_tickets, csat])
+            data.append([customer_id, first_name, last_name, state, purchase_date, snapshot_date, relationship_months, contract_years, contract_months, vertical, mrr, support_tickets, csat, percent_to_goal])
 
-    df = pd.DataFrame(data, columns=['CustomerID', 'FirstName', 'LastName', 'State', 'FirstPurchaseDate', 'SnapshotDate', 'RelationshipTerm', 'ContractYears', 'ContractMonths', 'Vertical', 'MRR', 'SupportTickets', 'AverageCSAT'])
+    df = pd.DataFrame(data, columns=['CustomerID', 'FirstName', 'LastName', 'State', 'FirstPurchaseDate', 'SnapshotDate', 'RelationshipTerm', 'ContractYears', 'ContractMonths', 'Vertical', 'MRR', 'SupportTickets', 'AverageCSAT', 'PercentToGoal'])    
     return df
-
-# Example usage
-n_customers = 2000  # You can change the number of customers as needed
-n_months = 36  # Number of months for snapshots
 
 # Generate customer data
 customer_df = generate_customer_data(n_customers, n_months)
@@ -156,7 +158,7 @@ customer_df_final['ContractStatus'] = customer_df_final['ContractStatus_y'].comb
 customer_df_final.drop(columns=['MRR_x', 'MRR_y', 'ContractStatus_x', 'ContractStatus_y'], inplace=True)
 
 # # Save customer data to CSV files
-customer_df_final.to_csv(os.path.join(data_dir, 'customer_detail_data_.csv'), index=False)
+customer_df_final.to_csv(os.path.join(data_dir, 'customer_detail_data.csv'), index=False)
 
 # Create MRR data
 mrr_data = customer_df_final[['SnapshotDate', 'MRR']].groupby('SnapshotDate').sum().reset_index()

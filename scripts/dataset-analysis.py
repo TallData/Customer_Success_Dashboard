@@ -17,6 +17,7 @@ if not os.path.exists(analysis_dir):
 
 # Load the combined customer data
 combined_data = pd.read_csv(os.path.join(data_dir, 'customer_detail_data.csv'))
+print(data_dir)
 
 # Group the data by 'SnapshotDate' and 'Verticals', and calculate the mean MRR for each group
 mrr_by_vertical = combined_data.groupby(['SnapshotDate', 'Vertical'])['MRR'].mean().reset_index()
@@ -45,5 +46,36 @@ plt.savefig(plot_file)
 # Display a message indicating the successful generation of the plot
 print(f"Monthly MRR by Vertical plot saved as {plot_file}")
 
-# Display the plot
-#plt.show()
+
+combined_data.to_csv(os.path.join(data_dir, 'analysis_test.csv'), index=False)
+
+#Add a new column 'MRR_PercentToGoal' by dividing 'MRR' by 'PercentToGoal'
+combined_data['MRR_PercentToGoal'] = combined_data['MRR'] / combined_data['PercentToGoal']
+
+# Group the data by 'Vertical' and calculate the mean MRR and MRR_PercentToGoal for each group
+mrr_by_vertical = combined_data.groupby('Vertical')[['MRR', 'MRR_PercentToGoal']].mean()
+
+# Plot the data as side-by-side bar charts
+plt.figure(figsize=(12, 6))
+mrr_by_vertical.plot(kind='bar', width=0.4)
+plt.title('Monthly Average MRR and MRR Percent to Goal by Vertical')
+plt.xlabel('Vertical')
+plt.ylabel('Average MRR')
+plt.legend(['MRR', 'MRR Percent to Goal'])
+plt.grid(True)
+
+# Set the Y-axis limits
+plt.ylim(1000, 2000)
+
+# Rotate the X-axis labels by 0 degrees
+plt.xticks(rotation=0)
+
+# Save the plot in the analysis folder
+plot_file = os.path.join(analysis_dir, 'monthly_mrr_vs_mrr_percent_to_goal_by_vertical.png')
+plt.savefig(plot_file)
+
+# Display a message indicating the successful generation of the plot
+print(f"Monthly MRR vs MRR Percent to Goal by Vertical plot saved as {plot_file}")
+
+# # Display the plot
+# #plt.show()
